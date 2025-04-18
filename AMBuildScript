@@ -83,6 +83,7 @@ class SDKConfig(object):
     cxx.cflags += [
       '-Wall',
       '-Werror',
+      '-Wno-reorder-ctor',
       '-Wno-overloaded-virtual',
       '-Wno-unused-function',
       '-Wno-unknown-pragmas',

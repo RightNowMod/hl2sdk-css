@@ -185,7 +185,7 @@ void CWordTag::SetWord( const char *word )
 	if ( !word || !word[ 0 ] )
 		return;
 
-	int len = V_strlen( word ) + 1;
+	int len = strlen( word ) + 1;
 	m_pszWord = new char[ len ];
 	Assert( m_pszWord );
 	Q_strncpy( m_pszWord, word, len );
@@ -345,7 +345,9 @@ unsigned int CPhonemeTag::ComputeDataCheckSum()
 //-----------------------------------------------------------------------------
 // Purpose: Simple language to string and string to language lookup dictionary
 //-----------------------------------------------------------------------------
+#if defined(__i386__) || defined(__x86_64__)
 #pragma pack(1)
+#endif
 
 struct CCLanguage
 {
@@ -369,8 +371,9 @@ static CCLanguage g_CCLanguageLookup[] =
 	{ CC_THAI,		"thai",			0 ,		150,	250 },
 	{ CC_PORTUGUESE,"portuguese",	0 ,		0,		150 },	
 };
-
+#if defined(__i386__) || defined(__x86_64__)
 #pragma pack()
+#endif
 
 void CSentence::ColorForLanguage( int language, unsigned char& r, unsigned char& g, unsigned char& b )
 {
@@ -560,14 +563,13 @@ void CSentence::ParseEmphasis( CUtlBuffer& buf )
 	}
 }
 
-// This is obsolete, so it doesn't do anything with the data which is parsed, but is needed to advance the correct
-// amount in the stream.
+// This is obsolete, so it doesn't do anything with the data which is parsed.
 void CSentence::ParseCloseCaption( CUtlBuffer& buf )
 {
 	char token[ 4096 ];
 	while ( 1 )
 	{
-		// Format is
+		// Format is 
 		// language_name
 		// {
 		//   PHRASE char streamlength "streambytes" starttime endtime
@@ -611,19 +613,12 @@ void CSentence::ParseCloseCaption( CUtlBuffer& buf )
 
 			buf.GetString( token );
 			cc_length = atoi( token );
-
-			if ( cc_length < 0 || (unsigned int)cc_length >= ARRAYSIZE( cc_stream ) )
-			{
-				Warning( "Invalid CloseCaption data - segment length %d is out of bounds\n", cc_length );
-				AssertMsg( false, "Invalid CloseCaption data" );
-				break;
-			}
-
+			Assert( cc_length >= 0 && cc_length < sizeof( cc_stream ) );
 			// Skip space
 			buf.GetChar();
 			buf.Get( cc_stream, cc_length );
 			cc_stream[ cc_length ] = 0;
-
+			
 			// Skip space
 			buf.GetChar();
 			buf.GetString( token );

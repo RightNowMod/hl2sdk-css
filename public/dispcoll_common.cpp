@@ -429,7 +429,13 @@ void CDispCollTree::AABBTree_CreateLeafs( void )
 	}
 }
 
-void CDispCollTree::AABBTree_GenerateBoxes_r( int nodeIndex, Vector *pMins, Vector *pMaxs )
+#if COMPILER_CLANG
+#define NOASAN __attribute__((no_sanitize("address")))
+#else
+#define NOASAN
+#endif
+
+void NOASAN CDispCollTree::AABBTree_GenerateBoxes_r( int nodeIndex, Vector *pMins, Vector *pMaxs )
 {
 	// leaf
 	ClearBounds( *pMins, *pMaxs );
@@ -461,6 +467,7 @@ void CDispCollTree::AABBTree_GenerateBoxes_r( int nodeIndex, Vector *pMins, Vect
 	}
 }
 
+#undef NOASAN
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -809,6 +816,7 @@ bool CDispCollTree::AABBTree_IntersectAABB( const Vector &absMins, const Vector 
 	mins0.DuplicateVector(absMins);
 	FourVectors maxs0;
 	maxs0.DuplicateVector(absMaxs);
+	FourVectors rayExtents;
 	while ( listIndex <= maxIndex )
 	{
 		int iNode = nodeList[listIndex];
@@ -1009,6 +1017,7 @@ bool FORCEINLINE CDispCollTree::AxisPlanesXYZ( const Ray_t &ray, CDispCollTri *p
 		}
 	};
 
+	Vector vecImpactNormal;
 	float flDist, flExpDist, flStart, flEnd;
 	
 	int iAxis;
@@ -1498,7 +1507,7 @@ CDispCollTree *DispCollTrees_Alloc( int count )
 {
 	CDispCollTree *pTrees = NULL;
 #ifdef ENGINE_DLL
-	pTrees = (CDispCollTree *)Hunk_AllocName( count * sizeof(CDispCollTree), "DispCollTrees_Alloc", false );
+	pTrees = (CDispCollTree *)Hunk_Alloc( count * sizeof(CDispCollTree), false );
 	g_nTrees = count;
 	for ( int i = 0; i < g_nTrees; i++ )
 	{

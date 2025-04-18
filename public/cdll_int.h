@@ -56,6 +56,7 @@ class IAchievementMgr;
 class CGamestatsData;
 class KeyValues;
 class IFileList;
+class IMaterialProxy;
 class CRenamedRecvTableInfo;
 class CMouthInfo;
 class IConVar;
@@ -67,7 +68,7 @@ class IConVar;
 
 // Engine player info, no game related infos here
 // If you change this, change the two byteswap defintions: 
-// cdll_client_int.cpp and host.cpp
+// cdll_client_int.cpp and cdll_engine_int.cpp
 typedef struct player_info_s
 {
 	DECLARE_BYTESWAP_DATADESC();
@@ -575,8 +576,6 @@ public:
 	virtual void DisconnectInternal() = 0;
 
 	virtual int GetInstancesRunningCount( ) = 0;
-
-	virtual void SetRichPresenceConnect( const char *pszOverride ) = 0;
 };
 
 
@@ -758,6 +757,8 @@ public:
 
 	virtual void			IN_SetSampleTime( float frametime ) = 0;
 
+	virtual IMaterialProxy *InstantiateMaterialProxy( const char *proxyName ) = 0;
+
 
 	// For sv_pure mode. The filesystem figures out which files the client needs to reload to be "pure" ala the server's preferences.
 	virtual void			ReloadFilesInList( IFileList *pFilesToReload ) = 0;
@@ -792,9 +793,7 @@ public:
 
 	virtual bool IsConnectedUserInfoChangeAllowed( IConVar *pCvar ) = 0;
 
-	virtual bool BHaveChatSuspensionInCurrentMatch() = 0;
-
-	virtual void DisplayVoiceUnavailableMessage() = 0;
+	virtual void IN_TouchEvent( uint data, uint data2, uint data3, uint data4 ) = 0;
 };
 
 #define CLIENT_DLL_INTERFACE_VERSION		"VClient017"

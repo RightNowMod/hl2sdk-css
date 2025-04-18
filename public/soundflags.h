@@ -129,6 +129,11 @@ enum SoundFlags_t
 	SND_IGNORE_NAME		= (1<<9),		// used to change all sounds emitted by an entity, regardless of scriptname
 
 	SND_DO_NOT_OVERWRITE_EXISTING_ON_CHANNEL = (1<<10),
+
+	SND_UPDATE_DELAY_FOR_CHOREO	= (1<<11),		// True if we have to update snd_delay_for_choreo with the IO latency.
+	SND_GENERATE_GUID			= (1<<12),		// True if we generate the GUID when we send the sound.
+
+	SND_OVERRIDE_PITCH			= (1<<13),		// The pitch given in code overrides what is present in the sound entry.
 };
 
 #define SND_FLAG_BITS_ENCODE 11

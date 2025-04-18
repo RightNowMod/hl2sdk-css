@@ -62,8 +62,14 @@ typedef enum _fieldtypes
 	FIELD_INTERVAL,			// a start and range floating point interval ( e.g., 3.2->3.6 == 3.2 and 0.4 )
 	FIELD_MODELINDEX,		// a model index
 	FIELD_MATERIALINDEX,	// a material index (using the material precache string table)
-	
+
 	FIELD_VECTOR2D,			// 2 floats
+
+	FIELD_POINTER,
+
+	FIELD_INTEGER64,        // 64bit integer
+
+	FIELD_VECTOR4D,			// 4 floats
 
 	FIELD_TYPECOUNT,		// MUST BE LAST
 } fieldtype_t;
@@ -81,7 +87,7 @@ public:
 		SIZE = 0
 	};
 
-	static int FieldSize( )
+	static int FieldSize()
 	{
 		return 0;
 	}
@@ -92,47 +98,68 @@ public:
 #define FIELD_SIZE( _fieldType )	CDatamapFieldSizeDeducer<_fieldType>::SIZE
 #define FIELD_BITS( _fieldType )	(FIELD_SIZE( _fieldType ) * 8)
 
-DECLARE_FIELD_SIZE( FIELD_FLOAT,		sizeof(float) )
-DECLARE_FIELD_SIZE( FIELD_STRING,		sizeof(intp) )
-DECLARE_FIELD_SIZE( FIELD_VECTOR,		3 * sizeof(float) )
-DECLARE_FIELD_SIZE( FIELD_VECTOR2D,		2 * sizeof(float) )
-DECLARE_FIELD_SIZE( FIELD_QUATERNION,	4 * sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_INTEGER,		sizeof(int))
-DECLARE_FIELD_SIZE( FIELD_BOOLEAN,		sizeof(char))
-DECLARE_FIELD_SIZE( FIELD_SHORT,		sizeof(short))
-DECLARE_FIELD_SIZE( FIELD_CHARACTER,	sizeof(char))
-DECLARE_FIELD_SIZE( FIELD_COLOR32,		sizeof(int))
-DECLARE_FIELD_SIZE( FIELD_CLASSPTR,		sizeof(intp))
-DECLARE_FIELD_SIZE( FIELD_EHANDLE,		sizeof(int))
-DECLARE_FIELD_SIZE( FIELD_EDICT,		sizeof(int))
-DECLARE_FIELD_SIZE( FIELD_POSITION_VECTOR, 	3 * sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_TIME,			sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_TICK,			sizeof(int))
-DECLARE_FIELD_SIZE( FIELD_MODELNAME,	sizeof(intp))
-DECLARE_FIELD_SIZE( FIELD_SOUNDNAME,	sizeof(intp))
-DECLARE_FIELD_SIZE( FIELD_INPUT,		sizeof(int))
+DECLARE_FIELD_SIZE(FIELD_FLOAT, sizeof(float))
+//DECLARE_FIELD_SIZE(FIELD_STRING, sizeof(int))
+DECLARE_FIELD_SIZE(FIELD_VECTOR, 3 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_VECTOR2D, 2 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_VECTOR4D, 4 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_QUATERNION, 4 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_INTEGER, sizeof(int))
+DECLARE_FIELD_SIZE(FIELD_BOOLEAN, sizeof(char))
+DECLARE_FIELD_SIZE(FIELD_SHORT, sizeof(short))
+DECLARE_FIELD_SIZE(FIELD_CHARACTER, sizeof(char))
+DECLARE_FIELD_SIZE(FIELD_COLOR32, sizeof(int))
+
+
+//DECLARE_FIELD_SIZE(FIELD_CLASSPTR, sizeof(int))
+//DECLARE_FIELD_SIZE(FIELD_EHANDLE, sizeof(int))
+//DECLARE_FIELD_SIZE(FIELD_EDICT, sizeof(int))
+
+
+DECLARE_FIELD_SIZE( FIELD_STRING,		sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_POINTER,		sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_MODELNAME,	sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_SOUNDNAME,	sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_EHANDLE,		sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_CLASSPTR,		sizeof(void*))
+DECLARE_FIELD_SIZE( FIELD_EDICT,		sizeof(void*))
+
+
+
+DECLARE_FIELD_SIZE(FIELD_POSITION_VECTOR, 3 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_TIME, sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_TICK, sizeof(int))
+
+
+
+//DECLARE_FIELD_SIZE(FIELD_MODELNAME, sizeof(int))
+//DECLARE_FIELD_SIZE(FIELD_SOUNDNAME, sizeof(int))
+
+
+
+DECLARE_FIELD_SIZE(FIELD_INPUT, sizeof(int))
 #ifdef POSIX
 // pointer to members under gnuc are 8bytes if you have a virtual func
-DECLARE_FIELD_SIZE( FIELD_FUNCTION,		sizeof(uint64))
+//DECLARE_FIELD_SIZE(FIELD_FUNCTION, sizeof(uint64))
+DECLARE_FIELD_SIZE( FIELD_FUNCTION,		2 * sizeof(void *))
 #else
-DECLARE_FIELD_SIZE( FIELD_FUNCTION,		sizeof(int *))
+//DECLARE_FIELD_SIZE(FIELD_FUNCTION, sizeof(int*))
+DECLARE_FIELD_SIZE( FIELD_FUNCTION,		sizeof(void *))
 #endif
-DECLARE_FIELD_SIZE( FIELD_VMATRIX,		16 * sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_VMATRIX_WORLDSPACE,	16 * sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_MATRIX3X4_WORLDSPACE,	12 * sizeof(float))
-DECLARE_FIELD_SIZE( FIELD_INTERVAL,		2 * sizeof( float) )  // NOTE:  Must match interval.h definition
-DECLARE_FIELD_SIZE( FIELD_MODELINDEX,	sizeof(int) )
-DECLARE_FIELD_SIZE( FIELD_MATERIALINDEX,	sizeof(int) )
+DECLARE_FIELD_SIZE(FIELD_VMATRIX, 16 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_VMATRIX_WORLDSPACE, 16 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_MATRIX3X4_WORLDSPACE, 12 * sizeof(float))
+DECLARE_FIELD_SIZE(FIELD_INTERVAL, 2 * sizeof(float))  // NOTE:  Must match interval.h definition
+DECLARE_FIELD_SIZE(FIELD_MODELINDEX, sizeof(int))
+DECLARE_FIELD_SIZE(FIELD_MATERIALINDEX, sizeof(int))
 
 
 #define ARRAYSIZE2D(p)		(sizeof(p)/sizeof(p[0][0]))
 #define SIZE_OF_ARRAY(p)	_ARRAYSIZE(p)
 
-// Normal offset of is invalid on non-array-types, this is dubious as hell. The rest of the codebase converted to the
-// legit offsetof from the C headers, so we'll use the old impl here to avoid exposing temptation to others
-#define _hacky_datamap_offsetof(s,m)	((size_t)&(((s *)0)->m))
+#define _offsetof(s,m)	((int)(intp)&(((s *)0)->m))
 
-#define _FIELD(name,fieldtype,count,flags,mapname,tolerance)		{ fieldtype, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, count, flags, mapname, NULL, NULL, NULL, sizeof( ((classNameTypedef *)0)->name ), NULL, 0, tolerance }
+#define _FIELD(name,fieldtype,count,flags,mapname,tolerance)		{ fieldtype, #name, { _offsetof(classNameTypedef, name), 0 }, count, flags, mapname, NULL, NULL, NULL, sizeof( ((classNameTypedef *)0)->name ), NULL, 0, tolerance }
 #define DEFINE_FIELD_NULL	{ FIELD_VOID,0, {0,0},0,0,0,0,0,0}
 #define DEFINE_FIELD(name,fieldtype)			_FIELD(name, fieldtype, 1,  FTYPEDESC_SAVE, NULL, 0 )
 #define DEFINE_KEYFIELD(name,fieldtype, mapname) _FIELD(name, fieldtype, 1,  FTYPEDESC_KEY | FTYPEDESC_SAVE, mapname, 0 )
@@ -144,35 +171,35 @@ DECLARE_FIELD_SIZE( FIELD_MATERIALINDEX,	sizeof(int) )
 #define DEFINE_ENTITY_GLOBAL_FIELD(name,fieldtype)	_FIELD(edict_t, name, fieldtype, 1,  FTYPEDESC_KEY | FTYPEDESC_SAVE | FTYPEDESC_GLOBAL, #name, 0 )
 #define DEFINE_GLOBAL_FIELD(name,fieldtype)	_FIELD(name, fieldtype, 1,  FTYPEDESC_GLOBAL | FTYPEDESC_SAVE, NULL, 0 )
 #define DEFINE_GLOBAL_KEYFIELD(name,fieldtype, mapname)	_FIELD(name, fieldtype, 1,  FTYPEDESC_GLOBAL | FTYPEDESC_KEY | FTYPEDESC_SAVE, mapname, 0 )
-#define DEFINE_CUSTOM_FIELD(name,datafuncs)	{ FIELD_CUSTOM, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, datafuncs, NULL }
-#define DEFINE_CUSTOM_KEYFIELD(name,datafuncs,mapname)	{ FIELD_CUSTOM, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_KEY, mapname, datafuncs, NULL }
+#define DEFINE_CUSTOM_FIELD(name,datafuncs)	{ FIELD_CUSTOM, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, datafuncs, NULL }
+#define DEFINE_CUSTOM_KEYFIELD(name,datafuncs,mapname)	{ FIELD_CUSTOM, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_KEY, mapname, datafuncs, NULL }
 #define DEFINE_AUTO_ARRAY2D(name,fieldtype)		_FIELD(name, fieldtype, ARRAYSIZE2D(((classNameTypedef *)0)->name), FTYPEDESC_SAVE, NULL, 0 )
 // Used by byteswap datadescs
 #define DEFINE_BITFIELD(name,fieldtype,bitcount)	DEFINE_ARRAY(name,fieldtype,((bitcount+FIELD_BITS(fieldtype)-1)&~(FIELD_BITS(fieldtype)-1)) / FIELD_BITS(fieldtype) )
 #define DEFINE_INDEX(name,fieldtype)			_FIELD(name, fieldtype, 1,  FTYPEDESC_INDEX, NULL, 0 )
 
 #define DEFINE_EMBEDDED( name )						\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name.m_DataMap), sizeof( ((classNameTypedef *)0)->name ), NULL, 0, 0.0f }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name.m_DataMap), sizeof( ((classNameTypedef *)0)->name ), NULL, 0, 0.0f }
 
 #define DEFINE_EMBEDDED_OVERRIDE( name, overridetype )	\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &((overridetype *)0)->m_DataMap, sizeof( ((classNameTypedef *)0)->name ), NULL, 0, 0.0f }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &((overridetype *)0)->m_DataMap, sizeof( ((classNameTypedef *)0)->name ), NULL, 0, 0.0f }
 
 #define DEFINE_EMBEDDEDBYREF( name )					\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_PTR, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( *(((classNameTypedef *)0)->name) ), NULL, 0, 0.0f }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_PTR, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( *(((classNameTypedef *)0)->name) ), NULL, 0, 0.0f }
 
 #define DEFINE_EMBEDDED_ARRAY( name, count )			\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, count, FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( ((classNameTypedef *)0)->name[0] ), NULL, 0, 0.0f  }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, count, FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( ((classNameTypedef *)0)->name[0] ), NULL, 0, 0.0f  }
 
 #define DEFINE_EMBEDDED_AUTO_ARRAY( name )			\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, SIZE_OF_ARRAY( ((classNameTypedef *)0)->name ), FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( ((classNameTypedef *)0)->name[0] ), NULL, 0, 0.0f  }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, SIZE_OF_ARRAY( ((classNameTypedef *)0)->name ), FTYPEDESC_SAVE, NULL, NULL, NULL, &(((classNameTypedef *)0)->name->m_DataMap), sizeof( ((classNameTypedef *)0)->name[0] ), NULL, 0, 0.0f  }
 
 #ifndef NO_ENTITY_PREDICTION
 
 #define DEFINE_PRED_TYPEDESCRIPTION( name, fieldtype )						\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &fieldtype::m_PredMap }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE, NULL, NULL, NULL, &fieldtype::m_PredMap }
 
 #define DEFINE_PRED_TYPEDESCRIPTION_PTR( name, fieldtype )						\
-	{ FIELD_EMBEDDED, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_PTR, NULL, NULL, NULL, &fieldtype::m_PredMap }
+	{ FIELD_EMBEDDED, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_SAVE | FTYPEDESC_PTR, NULL, NULL, NULL, &fieldtype::m_PredMap }
 
 #else
 
@@ -193,15 +220,15 @@ DECLARE_FIELD_SIZE( FIELD_MATERIALINDEX,	sizeof(int) )
 //#define DEFINE_DATA( name, fieldextname, flags ) _FIELD(name, fieldtype, 1,  flags, extname )
 
 // INPUTS
-#define DEFINE_INPUT( name, fieldtype, inputname ) { fieldtype, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_INPUT | FTYPEDESC_SAVE | FTYPEDESC_KEY,	inputname, NULL, NULL, NULL, sizeof( ((classNameTypedef *)0)->name ) }
+#define DEFINE_INPUT( name, fieldtype, inputname ) { fieldtype, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_INPUT | FTYPEDESC_SAVE | FTYPEDESC_KEY,	inputname, NULL, NULL, NULL, sizeof( ((classNameTypedef *)0)->name ) }
 #define DEFINE_INPUTFUNC( fieldtype, inputname, inputfunc ) { fieldtype, #inputfunc, { NULL, NULL }, 1, FTYPEDESC_INPUT, inputname, NULL, static_cast <inputfunc_t> (&classNameTypedef::inputfunc) }
 
 // OUTPUTS
 // the variable 'name' MUST BE derived from CBaseOutput
 // we know the output type from the variable itself, so it doesn't need to be specified here
 class ISaveRestoreOps;
-extern ISaveRestoreOps *eventFuncs;
-#define DEFINE_OUTPUT( name, outputname )	{ FIELD_CUSTOM, #name, { (int)_hacky_datamap_offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_OUTPUT | FTYPEDESC_SAVE | FTYPEDESC_KEY, outputname, eventFuncs }
+extern ISaveRestoreOps* eventFuncs;
+#define DEFINE_OUTPUT( name, outputname )	{ FIELD_CUSTOM, #name, { _offsetof(classNameTypedef, name), 0 }, 1, FTYPEDESC_OUTPUT | FTYPEDESC_SAVE | FTYPEDESC_KEY, outputname, eventFuncs }
 
 // replaces EXPORT table for portability and non-DLL based systems (xbox)
 #define DEFINE_FUNCTION_RAW( function, func_type )			{ FIELD_VOID, nameHolder.GenerateName(#function), { NULL, NULL }, 1, FTYPEDESC_FUNCTIONTABLE, NULL, NULL, (inputfunc_t)((func_type)(&classNameTypedef::function)) }
@@ -232,9 +259,6 @@ extern ISaveRestoreOps *eventFuncs;
 #define FTYPEDESC_VIEW_OWN_TEAM			0x4000		// Only show this data if the player is on the same team as the local player
 #define FTYPEDESC_VIEW_NEVER			0x8000		// Never show this field to anyone, even the local player (unusual)
 
-// Define shared with others, this is pred only, and FTYPEDESC_VIEW_OTHER_PLAYER is not used for pred.
-#define FTYPEDESC_ONLY_ERROR_IF_ABOVE_ZERO_TO_ZERO_OR_BELOW_ETC		0x2000	// misyl: Only throw a prediction error if this changes from > 0 -> <= 0
-
 #define TD_MSECTOLERANCE		0.001f		// This is a FIELD_FLOAT and should only be checked to be within 0.001 of the networked info
 
 struct typedescription_t;
@@ -245,7 +269,7 @@ class ISaveRestoreOps;
 //
 // Function prototype for all input handlers.
 //
-typedef void (CBaseEntity::*inputfunc_t)(inputdata_t &data);
+typedef void (CBaseEntity::* inputfunc_t)(inputdata_t& data);
 
 struct datamap_t;
 struct typedescription_t;
@@ -262,28 +286,28 @@ enum
 struct typedescription_t
 {
 	fieldtype_t			fieldType;
-	const char			*fieldName;
-	int					fieldOffset[ TD_OFFSET_COUNT ]; // 0 == normal, 1 == packed offset
+	const char* fieldName;
+	int					fieldOffset[TD_OFFSET_COUNT]; // 0 == normal, 1 == packed offset
 	unsigned short		fieldSize;
 	short				flags;
 	// the name of the variable in the map/fgd data, or the name of the action
-	const char			*externalName;	
+	const char* externalName;
 	// pointer to the function set for save/restoring of custom data types
-	ISaveRestoreOps		*pSaveRestoreOps; 
+	ISaveRestoreOps* pSaveRestoreOps;
 	// for associating function with string names
-	inputfunc_t			inputFunc; 
+	inputfunc_t			inputFunc;
 	// For embedding additional datatables inside this one
-	datamap_t			*td;
+	datamap_t* td;
 
 	// Stores the actual member variable size in bytes
 	int					fieldSizeInBytes;
 
 	// FTYPEDESC_OVERRIDE point to first baseclass instance if chains_validated has occurred
-	struct typedescription_t *override_field;
+	struct typedescription_t* override_field;
 
 	// Used to track exclusion of baseclass fields
 	int					override_count;
-  
+
 	// Tolerance for field errors for float fields
 	float				fieldTolerance;
 };
@@ -295,10 +319,10 @@ struct typedescription_t
 //-----------------------------------------------------------------------------
 struct datamap_t
 {
-	typedescription_t	*dataDesc;
+	typedescription_t* dataDesc;
 	int					dataNumFields;
-	char const			*dataClassName;
-	datamap_t			*baseMap;
+	char const* dataClassName;
+	datamap_t* baseMap;
 
 	bool				chains_validated;
 	// Have the "packed" offsets been computed
@@ -320,6 +344,22 @@ struct datamap_t
 	static datamap_t *GetBaseMap(); \
 	template <typename T> friend void DataMapAccess(T *, datamap_t **p); \
 	template <typename T> friend datamap_t *DataMapInit(T *);
+
+#if defined(POSIX) && !defined(_PS3)
+
+#define DECLARE_SIMPLE_DATADESC_INSIDE_NAMESPACE() \
+	static datamap_t m_DataMap; \
+	static datamap_t *GetBaseMap(); \
+	template <typename T> friend void ::DataMapAccess(T *, datamap_t **p); 
+
+#else
+#define DECLARE_SIMPLE_DATADESC_INSIDE_NAMESPACE() \
+	static datamap_t m_DataMap; \
+	static datamap_t *GetBaseMap(); \
+	template <typename T> friend void ::DataMapAccess(T *, datamap_t **p); \
+	template <typename T> friend datamap_t *::DataMapInit(T *);
+
+#endif
 
 #define	DECLARE_DATADESC() \
 	DECLARE_SIMPLE_DATADESC() \
@@ -362,14 +402,14 @@ struct datamap_t
 		className::m_DataMap.baseMap = className::GetBaseMap(); \
 		static typedescription_t dataDesc[] = \
 		{ \
-		{ FIELD_VOID,nullptr, {0,0},0,0,nullptr,nullptr,nullptr,nullptr}, /* so you can define "empty" tables */
+		{ FIELD_VOID,0, {0,0},0,0,0,0,0,0}, /* so you can define "empty" tables */
 
 #define END_DATADESC() \
 		}; \
 		\
 		if ( sizeof( dataDesc ) > sizeof( dataDesc[0] ) ) \
 		{ \
-			classNameTypedef::m_DataMap.dataNumFields = int(SIZE_OF_ARRAY( dataDesc ) - 1); \
+			classNameTypedef::m_DataMap.dataNumFields = SIZE_OF_ARRAY( dataDesc ) - 1; \
 			classNameTypedef::m_DataMap.dataDesc 	  = &dataDesc[1]; \
 		} \
 		else \
@@ -415,8 +455,8 @@ struct datamap_t
 
 //-----------------------------------------------------------------------------
 
-template <typename T> 
-inline void DataMapAccess(T *ignored, datamap_t **p)
+template <typename T>
+inline void DataMapAccess(T* ignored, datamap_t** p)
 {
 	*p = &T::m_DataMap;
 }
@@ -426,36 +466,40 @@ inline void DataMapAccess(T *ignored, datamap_t **p)
 class CDatadescGeneratedNameHolder
 {
 public:
-	CDatadescGeneratedNameHolder( const char *pszBase )
-	 : m_pszBase(pszBase)
+	CDatadescGeneratedNameHolder(const char* pszBase)
+		: m_pszBase(pszBase)
 	{
-		m_nLenBase = strlen( m_pszBase );
+		m_nLenBase = strlen(m_pszBase);
 	}
-	
+
 	~CDatadescGeneratedNameHolder()
 	{
-		for ( int i = 0; i < m_Names.Count(); i++ )
+		for (int i = 0; i < m_Names.Count(); i++)
 		{
-			delete m_Names[i];
+			delete[] m_Names[i];
 		}
 	}
-	
-	const char *GenerateName( const char *pszIdentifier )
+
+	const char* GenerateName(const char* pszIdentifier)
 	{
-		char *pBuf = new char[m_nLenBase + strlen(pszIdentifier) + 1];
-		strcpy( pBuf, m_pszBase );
-		strcat( pBuf, pszIdentifier );
-		m_Names.AddToTail( pBuf );
+		char* pBuf = new char[m_nLenBase + strlen(pszIdentifier) + 1];
+		strcpy(pBuf, m_pszBase);
+		strcat(pBuf, pszIdentifier);
+		m_Names.AddToTail(pBuf);
 		return pBuf;
 	}
-	
+
 private:
-	const char *m_pszBase;
+	const char* m_pszBase;
 	size_t m_nLenBase;
-	CUtlVector<char *> m_Names;
+	CUtlVector<char*> m_Names;
 };
 
 //-----------------------------------------------------------------------------
+
+// Compiler can require the global-namespace template friend to be declared
+// before DECLARE_SIMPLE_DATADESC_INSIDE_NAMESPACE() can be used
+template <typename T> datamap_t* DataMapInit(T*);
 
 #include "tier0/memdbgoff.h"
 

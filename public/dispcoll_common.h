@@ -186,6 +186,9 @@ public:
 	inline void SetFlags( int nFlags )								{ m_nFlags = nFlags; }
 	inline bool CheckFlags( int nFlags )							{ return ( ( nFlags & GetFlags() ) != 0 ) ? true : false; }
 
+	inline int	GetTexinfoFlags( void )								{ return m_nTexinfoFlags; }
+	inline void SetTexinfoFlags( int nFlags )						{ m_nTexinfoFlags = nFlags; }
+
 	inline int GetWidth( void )										{ return ( ( 1 << m_nPower ) + 1 ); }
 	inline int GetHeight( void )									{ return ( ( 1 << m_nPower ) + 1 ); }
 	inline int GetSize( void )										{ return ( ( 1 << m_nPower ) + 1 ) * ( ( 1 << m_nPower ) + 1 ); }
@@ -314,6 +317,7 @@ protected:
 
 	int								m_nPower;								// Size of the displacement ( 2^power + 1 )
 	int								m_nFlags;
+	int							m_nTexinfoFlags;
 
 	Vector							m_vecSurfPoints[4];						// Base surface points.
 	// Collision data.

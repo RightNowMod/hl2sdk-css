@@ -285,7 +285,7 @@ inline bool RecvTable::IsInMainList() const
 
 // Normal offset of is invalid on non-array-types, this is dubious as hell. The rest of the codebase converted to the
 // legit offsetof from the C headers, so we'll use the old impl here to avoid exposing temptation to others
-#define _hacky_dtrecv_offsetof(s,m)	( (size_t)&(((s *)0x1000000)->m) - 0x1000000u )
+#define _hacky_dtrecv_offsetof(s,m)	((size_t)&(((s *)0)->m))
 
 #define RECVINFO(varName)						#varName, _hacky_dtrecv_offsetof(currentRecvDTClass, varName), sizeof(((currentRecvDTClass*)0)->varName)
 #define RECVINFO_NAME(varName, remoteVarName)	#remoteVarName, _hacky_dtrecv_offsetof(currentRecvDTClass, varName), sizeof(((currentRecvDTClass*)0)->varName)
@@ -309,6 +309,7 @@ void RecvProxy_Int32ToInt32  ( const CRecvProxyData *pData, void *pStruct, void 
 #ifdef SUPPORTS_INT64
 void RecvProxy_Int64ToInt64  ( const CRecvProxyData *pData, void *pStruct, void *pOut );
 #endif
+void RecvProxy_Int32ToColor32( const CRecvProxyData *pData, void *pStruct, void *pOut );
 
 // StaticDataTable does *pOut = pData.
 void DataTableRecvProxy_StaticDataTable(const RecvProp *pProp, void **pOut, void *pData, int objectID);

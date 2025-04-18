@@ -50,6 +50,7 @@ struct solid_t;
 class ISave;
 class IRestore;
 class C_BaseAnimating;
+class C_BaseAnimatingOverlay;
 class C_AI_BaseNPC;
 struct EmitSound_t;
 class C_RecipientFilter;
@@ -186,9 +187,12 @@ public:
 	DECLARE_PREDICTABLE();
 
 									C_BaseEntity();
+protected:
+	// Use UTIL_Remove to delete!
 	virtual							~C_BaseEntity();
-
+public:
 	static C_BaseEntity				*CreatePredictedEntityByName( const char *classname, const char *module, int line, bool persist = false );
+	static void						UpdateVisibilityAllEntities();
 	
 	// FireBullets uses shared code for prediction.
 	virtual void					FireBullets( const FireBulletsInfo_t &info );
@@ -253,6 +257,7 @@ public:
 	// This just picks one of the routes to IClientUnknown.
 	IClientUnknown*					GetIClientUnknown()	{ return this; }
 	virtual C_BaseAnimating*		GetBaseAnimating() { return NULL; }
+	virtual C_BaseAnimatingOverlay *GetBaseAnimatingOverlay() { return NULL; }
 	virtual void					SetClassname( const char *className );
 
 	string_t						m_iClassname;
@@ -447,6 +452,7 @@ public:
 	inline IPhysicsObject			*VPhysicsGetObject( void ) const { return m_pPhysicsObject; }
 	virtual int						VPhysicsGetObjectList( IPhysicsObject **pList, int listMax );
 	virtual bool					VPhysicsIsFlesh( void );
+	float							VPhysicsGetNonShadowMass( void ) const { return m_flNonShadowMass; }
 
 // IClientEntity implementation.
 public:
@@ -460,6 +466,9 @@ public:
 
 	virtual const Vector&			GetAbsOrigin( void ) const;
 	virtual const QAngle&			GetAbsAngles( void ) const;
+	inline Vector					Forward() const RESTRICT; ///< get my forward (+x) vector
+	inline Vector					Left() const RESTRICT;    ///< get my left    (+y) vector
+	inline Vector					Up() const RESTRICT;      ///< get my up      (+z) vector
 
 	const Vector&					GetNetworkOrigin() const;
 	const QAngle&					GetNetworkAngles() const;
@@ -487,8 +496,7 @@ public:
 
 	int								GetModelIndex( void ) const;
 	void							SetModelIndex( int index );
-	virtual int						CalcOverrideModelIndex() { return -1; }
-
+	
 	// These methods return a *world-aligned* box relative to the absorigin of the entity.
 	// This is used for collision purposes and is *not* guaranteed
 	// to surround the entire entity's visual representation
@@ -704,6 +712,7 @@ public:
 	// Initialize things given a new model.
 	virtual CStudioHdr				*OnNewModel();
 	virtual void					OnNewParticleEffect( const char *pszParticleName, CNewParticleEffect *pNewParticleEffect );
+	virtual void					OnParticleEffectDeleted( CNewParticleEffect *pParticleEffect );
 
 	bool							IsSimulatedEveryTick() const;
 	bool							IsAnimatedEveryTick() const;
@@ -816,7 +825,6 @@ public:
 	void							PreEntityPacketReceived( int commands_acknowledged );
 	void							PostEntityPacketReceived( void );
 	bool							PostNetworkDataReceived( int commands_acknowledged );
-	virtual bool					PredictionErrorShouldResetLatchedForAllPredictables( void ) { return true; } //legacy behavior is that any prediction error causes all predictables to reset latched
 	bool							GetPredictionEligible( void ) const;
 	void							SetPredictionEligible( bool canpredict );
 
@@ -927,6 +935,7 @@ public:
 	void					PhysicsImpact( C_BaseEntity *other, trace_t &trace );
  	void					PhysicsMarkEntitiesAsTouching( C_BaseEntity *other, trace_t &trace );
 	void					PhysicsMarkEntitiesAsTouchingEventDriven( C_BaseEntity *other, trace_t &trace );
+	void					PhysicsTouchTriggers( const Vector *pPrevAbsOrigin = NULL );
 
 	// Physics helper
 	static void				PhysicsRemoveTouchedList( C_BaseEntity *ent );
@@ -1047,7 +1056,7 @@ public:
 	// Returns false if the model name is bogus or otherwise can't be loaded
 	bool				SetModel( const char *pModelName );
 
-	void				SetModelPointer( const model_t *pModel );
+	virtual void		SetModelPointer( const model_t *pModel );
 
 
 	// Access movetype and solid.
@@ -1153,9 +1162,6 @@ public:
 
 	int		GetCreationTick() const;
 
-	virtual void ClientAdjustStartSoundParams( EmitSound_t &params ) {}
-	virtual void ClientAdjustStartSoundParams( StartSoundParams_t& params ) {}
-
 #ifdef _DEBUG
 	void FunctionCheck( void *pFunction, const char *name );
 
@@ -1224,8 +1230,8 @@ protected:
 
 	// Returns INTERPOLATE_STOP or INTERPOLATE_CONTINUE.
 	// bNoMoreChanges is set to 1 if you can call RemoveFromInterpolationList on the entity.
-	int BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QAngle &oldAngles, Vector &oldVel, int &bNoMoreChanges );
-	void BaseInterpolatePart2( Vector &oldOrigin, QAngle &oldAngles, Vector &oldVel, int nChangeFlags );
+	int BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QAngle &oldAngles, int &bNoMoreChanges );
+	void BaseInterpolatePart2( Vector &oldOrigin, QAngle &oldAngles, int nChangeFlags );
 
 
 public:
@@ -1420,6 +1426,7 @@ private:
 protected:
 	// pointer to the entity's physics object (vphysics.dll)
 	IPhysicsObject					*m_pPhysicsObject;	
+	float							m_flNonShadowMass;	// cached mass (shadow controllers set mass to VPHYSICS_MAX_MASS, or 50000)
 
 #if !defined( NO_ENTITY_PREDICTION )
 	bool							m_bPredictionEligible;
@@ -1518,7 +1525,6 @@ private:
 
 	// Object velocity
 	Vector							m_vecVelocity;
-	CInterpolatedVar< Vector >		m_iv_vecVelocity;
 
 	Vector							m_vecAbsVelocity;
 
@@ -2202,6 +2208,14 @@ inline bool C_BaseEntity::IsEnabledInToolView() const
 #else
 	return false;
 #endif
+}
+
+//-----------------------------------------------------------------------------
+// Client version of UTIL_Remove
+//-----------------------------------------------------------------------------
+inline void UTIL_Remove( C_BaseEntity *pEntity )
+{
+	pEntity->Remove();
 }
 
 //-----------------------------------------------------------------------------

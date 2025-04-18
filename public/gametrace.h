@@ -72,7 +72,7 @@ public:
 	// Otherwise, this is the hitbox index.
 	int			hitbox;					// box hit by trace in studio
 
-	CGameTrace() = default;
+	CGameTrace() {}
 
 private:
 	// No copy constructors allowed
@@ -96,84 +96,17 @@ typedef CGameTrace trace_t;
 #define TLD_DEF_LEAF_MAX	256
 #define TLD_DEF_ENTITY_MAX	1024
 
-// misyl: Made final to workaround the warning:
-//   "deleting object of polymorphic class type 'CTraceListData' which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]"
-// We can't change the ABI of IPartitionEnumerator, so...
-// Feel free to make a version of this class that's non final, and a final version for existing code and do your own thing in your own mod, if this breaks your usage.
-class CTraceListData final : public IPartitionEnumerator
+class ITraceListData
 {
 public:
+	virtual ~ITraceListData() {}
 
-	CTraceListData( int nLeafMax = TLD_DEF_LEAF_MAX, int nEntityMax = TLD_DEF_ENTITY_MAX )
-	{
-		MEM_ALLOC_CREDIT();
-		m_nLeafCount = 0;
-		m_aLeafList.SetSize( nLeafMax );
-
-		m_nEntityCount = 0;
-		m_aEntityList.SetSize( nEntityMax );
-	}
-
-	~CTraceListData()
-	{
-		m_nLeafCount = 0;
-		m_aLeafList.RemoveAll();
-
-		m_nEntityCount = 0;
-		m_aEntityList.RemoveAll();
-	}
-
-	void Reset( void )
-	{
-		m_nLeafCount = 0;
-		m_nEntityCount = 0;
-	}
-
-	bool	IsEmpty( void ) const			{ return ( m_nLeafCount == 0 && m_nEntityCount == 0 ); }
-
-	int		LeafCount( void ) const			{ return m_nLeafCount; }
-	int		LeafCountMax( void ) const		{ return m_aLeafList.Count(); }
-	void    LeafCountReset( void )			{ m_nLeafCount = 0; }
-
-	int		EntityCount( void ) const		{ return m_nEntityCount; }
-	int		EntityCountMax( void ) const	{ return m_aEntityList.Count(); }
-	void	EntityCountReset( void )		{ m_nEntityCount = 0; }
-
-	// For leaves...
-	void AddLeaf( int iLeaf )
-	{
-		if ( m_nLeafCount >= m_aLeafList.Count() )
-		{
-			DevMsg( "CTraceListData: Max leaf count along ray exceeded!\n" );
-			m_aLeafList.AddMultipleToTail( m_aLeafList.Count() );
-		}
-
-		m_aLeafList[m_nLeafCount] = iLeaf;
-		m_nLeafCount++;
-	}
-
-	// For entities...
-	IterationRetval_t EnumElement( IHandleEntity *pHandleEntity )
-	{
-		if ( m_nEntityCount >= m_aEntityList.Count() )
-		{
-			DevMsg( "CTraceListData: Max entity count along ray exceeded!\n" );
-			m_aEntityList.AddMultipleToTail( m_aEntityList.Count() );
-		}
-
-		m_aEntityList[m_nEntityCount] = pHandleEntity;
-		m_nEntityCount++;
-
-		return ITERATION_CONTINUE;
-	}
-	
-public:
-
-	int							m_nLeafCount;
-	CUtlVector<int>				m_aLeafList;
-
-	int							m_nEntityCount;
-	CUtlVector<IHandleEntity*>	m_aEntityList;
+	virtual void Reset() = 0;
+	virtual bool IsEmpty() = 0;
+	// CanTraceRay will return true if the current volume encloses the ray
+	// NOTE: The leaflist trace will NOT check this.  Traces are intersected
+	// against the culled volume exclusively.
+	virtual bool CanTraceRay( const Ray_t &ray ) = 0;
 };
 
 #endif // GAMETRACE_H

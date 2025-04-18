@@ -41,10 +41,6 @@
 #include "inetchannelinfo.h"
 #include "proto_version.h"
 
-#ifdef TF_CLIENT_DLL
-#include "c_tf_player.h"
-#endif
-
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -80,7 +76,7 @@ void cc_cl_interp_all_changed( IConVar *pConVar, const char *pOldString, float f
 static ConVar  cl_extrapolate( "cl_extrapolate", "1", FCVAR_CHEAT, "Enable/disable extrapolation if interpolation history runs out." );
 static ConVar  cl_interp_npcs( "cl_interp_npcs", "0.0", FCVAR_USERINFO, "Interpolate NPC positions starting this many seconds in past (or cl_interp, if greater)" );  
 static ConVar  cl_interp_all( "cl_interp_all", "0", 0, "Disable interpolation list optimizations.", 0, 0, 0, 0, cc_cl_interp_all_changed );
-ConVar  r_drawmodeldecals( "r_drawmodeldecals", "1", FCVAR_ALLOWED_IN_COMPETITIVE );
+ConVar  r_drawmodeldecals( "r_drawmodeldecals", "1" );
 extern ConVar	cl_showerror;
 int C_BaseEntity::m_nPredictionRandomSeed = -1;
 C_BasePlayer *C_BaseEntity::m_pPredictionPlayer = NULL;
@@ -820,7 +816,6 @@ void C_BaseEntity::Interp_RestoreToLastNetworked( VarMapping_t *map )
 
 	Vector oldOrigin = GetLocalOrigin();
 	QAngle oldAngles = GetLocalAngles();
-	Vector oldVel = GetLocalVelocity();
 
 	int c = map->m_Entries.Count();
 	for ( int i = 0; i < c; i++ )
@@ -830,7 +825,7 @@ void C_BaseEntity::Interp_RestoreToLastNetworked( VarMapping_t *map )
 		watcher->RestoreToLastNetworked();
 	}
 
-	BaseInterpolatePart2( oldOrigin, oldAngles, oldVel, 0 );
+	BaseInterpolatePart2( oldOrigin, oldAngles, 0 );
 }
 
 void C_BaseEntity::Interp_UpdateInterpolationAmounts( VarMapping_t *map )
@@ -896,19 +891,13 @@ inline int C_BaseEntity::Interp_Interpolate( VarMapping_t *map, float currentTim
 //-----------------------------------------------------------------------------
 C_BaseEntity::C_BaseEntity() : 
 	m_iv_vecOrigin( "C_BaseEntity::m_iv_vecOrigin" ),
-	m_iv_angRotation( "C_BaseEntity::m_iv_angRotation" ),
-	m_iv_vecVelocity( "C_BaseEntity::m_iv_vecVelocity" )
+	m_iv_angRotation( "C_BaseEntity::m_iv_angRotation" )
 {
 	m_pAttributes = NULL;
 
 	AddVar( &m_vecOrigin, &m_iv_vecOrigin, LATCH_SIMULATION_VAR );
 	AddVar( &m_angRotation, &m_iv_angRotation, LATCH_SIMULATION_VAR );
-	// Removing this until we figure out why velocity introduces view hitching.
-	// One possible fix is removing the player->ResetLatched() call in CGameMovement::FinishDuck(), 
-	// but that re-introduces a third-person hitching bug.  One possible cause is the abrupt change
-	// in player size/position that occurs when ducking, and how prediction tries to work through that.
-	//
-	// AddVar( &m_vecVelocity, &m_iv_vecVelocity, LATCH_SIMULATION_VAR );
+
 
 	m_DataChangeEventRef = -1;
 	m_EntClientFlags = 0;
@@ -1089,28 +1078,6 @@ bool C_BaseEntity::Init( int entnum, int iSerialNum )
 	Assert( entnum >= 0 && entnum < NUM_ENT_ENTRIES );
 
 	index = entnum;
-
-	if ( this->IsPlayer() )
-	{
-		// Josh: If we ever have a player that could ever cause us
-		// an out of bounds access to any player sized arrays.
-		// Just get out now!
-		//
-		// All these issues should be bounds checked now anyway,
-		// but I'd much rather be safe than sorry here.
-		//
-		// Additionally, make sure we aren't 0 or negative,
-		// the player CANNOT be worldspawn.
-		// Someone is going to try that to get an extra player and frog something up!
-		// 
-		// Player index is entindex - 1.
-		// MAX_PLAYERS_ARRAY_SAFE is MAX_PLAYERS + 1.
-		if ( index <= 0 || index >= MAX_PLAYERS_ARRAY_SAFE )
-		{
-			Warning("Player with out of bounds entindex! Got: %d Expected to be in inclusive range: %d - %d\n", index, 1, MAX_PLAYERS );
-			return false;
-		}
-	}
 
 	cl_entitylist->AddNetworkableEntity( GetIClientUnknown(), entnum, iSerialNum );
 
@@ -1364,6 +1331,23 @@ void C_BaseEntity::GetVectors(Vector* pForward, Vector* pRight, Vector* pUp) con
 	{
 		MatrixGetColumn( entityToWorld, 2, *pUp ); 
 	}
+}
+
+
+
+void C_BaseEntity::UpdateVisibilityAllEntities()
+{
+	C_BaseEntityIterator iterator;
+	C_BaseEntity *pEnt;
+	while ( (pEnt = iterator.Next()) != NULL )	
+	{
+		pEnt->UpdateVisibility();	
+	}
+}
+// (static function)
+CON_COMMAND( cl_updatevisibility, "Updates visibility bits." )
+{
+	C_BaseEntity::UpdateVisibilityAllEntities();
 }
 
 void C_BaseEntity::UpdateVisibility()
@@ -2404,6 +2388,7 @@ void C_BaseEntity::HierarchySetParent( C_BaseEntity *pNewParent )
 #ifdef TF_CLIENT_DLL
 	m_bValidatedOwner = false;
 #endif
+	InvalidatePhysicsRecursive( BOUNDS_CHANGED | SEQUENCE_CHANGED );
 }
 
 
@@ -2834,7 +2819,7 @@ void C_BaseEntity::OnLatchInterpolatedVariables( int flags )
 	}
 }
 
-int CBaseEntity::BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QAngle &oldAngles, Vector &oldVel, int &bNoMoreChanges )
+int CBaseEntity::BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QAngle &oldAngles, int &bNoMoreChanges )
 {
 	// Don't mess with the world!!!
 	bNoMoreChanges = 1;
@@ -2862,7 +2847,6 @@ int CBaseEntity::BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QA
 
 	oldOrigin = m_vecOrigin;
 	oldAngles = m_angRotation;
-	oldVel = m_vecVelocity;
 
 	bNoMoreChanges = Interp_Interpolate( GetVarMapping(), currentTime );
 	if ( cl_interp_all.GetInt() || (m_EntClientFlags & ENTCLIENTFLAG_ALWAYS_INTERPOLATE) )
@@ -2875,7 +2859,7 @@ int CBaseEntity::BaseInterpolatePart1( float &currentTime, Vector &oldOrigin, QA
 static ConVar cl_watchplayer( "cl_watchplayer", "-1", 0 );
 #endif
 
-void C_BaseEntity::BaseInterpolatePart2( Vector &oldOrigin, QAngle &oldAngles, Vector &oldVel, int nChangeFlags )
+void C_BaseEntity::BaseInterpolatePart2( Vector &oldOrigin, QAngle &oldAngles, int nChangeFlags )
 {
 	if ( m_vecOrigin != oldOrigin )
 	{
@@ -2887,10 +2871,6 @@ void C_BaseEntity::BaseInterpolatePart2( Vector &oldOrigin, QAngle &oldAngles, V
 		nChangeFlags |= ANGLES_CHANGED;
 	}
 
-	if ( m_vecVelocity != oldVel )
-	{
-		nChangeFlags |= VELOCITY_CHANGED;
-	}
 
 	if ( nChangeFlags != 0 )
 	{
@@ -2916,10 +2896,9 @@ bool C_BaseEntity::Interpolate( float currentTime )
 
 	Vector oldOrigin;
 	QAngle oldAngles;
-	Vector oldVel;
 
 	int bNoMoreChanges;
-	int retVal = BaseInterpolatePart1( currentTime, oldOrigin, oldAngles, oldVel, bNoMoreChanges );
+	int retVal = BaseInterpolatePart1( currentTime, oldOrigin, oldAngles, bNoMoreChanges );
 
 	// If all the Interpolate() calls returned that their values aren't going to
 	// change anymore, then get us out of the interpolation list.
@@ -2930,7 +2909,7 @@ bool C_BaseEntity::Interpolate( float currentTime )
 		return true;
 
 	int nChangeFlags = 0;
-	BaseInterpolatePart2( oldOrigin, oldAngles, oldVel, nChangeFlags );
+	BaseInterpolatePart2( oldOrigin, oldAngles, nChangeFlags );
 
 	return true;
 }
@@ -2945,6 +2924,11 @@ CStudioHdr *C_BaseEntity::OnNewModel()
 }
 
 void C_BaseEntity::OnNewParticleEffect( const char *pszParticleName, CNewParticleEffect *pNewParticleEffect )
+{
+	return;
+}
+
+void C_BaseEntity::OnParticleEffectDeleted( CNewParticleEffect *pParticleEffect )
 {
 	return;
 }
@@ -3219,22 +3203,25 @@ void C_BaseEntity::InterpolateServerEntities()
 {
 	VPROF_BUDGET( "C_BaseEntity::InterpolateServerEntities", VPROF_BUDGETGROUP_INTERPOLATION );
 
-	s_bInterpolate = cl_interpolate.GetBool();
+	bool bPrevInterpolate = s_bInterpolate;
+	
+	// Determine whether interpolation is enabled
+	bool bInterpolate = cl_interpolate.GetBool();
+	if ( !bInterpolate && engine->IsConnected() && !engine->IsPlayingDemo() )
+		bInterpolate = true; // client is connected and not playing demo and not on listen server, force interpolation ON
+	s_bInterpolate = bInterpolate;
 
-	// Don't interpolate during timedemo playback
+	// Don't interpolate during timedemo playback or when engine is paused
 	if ( engine->IsPlayingTimeDemo() || engine->IsPaused() )
 	{										 
 		s_bInterpolate = false;
 	}
 
-	if ( !engine->IsPlayingDemo() )
+	// Don't interpolate, either, if we are timing out
+	INetChannelInfo *nci = engine->GetNetChannelInfo();
+	if ( nci && nci->GetTimeSinceLastReceived() > 0.5f )
 	{
-		// Don't interpolate, either, if we are timing out
-		INetChannelInfo *nci = engine->GetNetChannelInfo();
-		if ( nci && nci->GetTimeSinceLastReceived() > 0.5f )
-		{
-			s_bInterpolate = false;
-		}
+		s_bInterpolate = false;
 	}
 
 	if ( IsSimulatingOnAlternateTicks() != g_bWasSkipping || IsEngineThreaded() != g_bWasThreaded )
@@ -3256,6 +3243,17 @@ void C_BaseEntity::InterpolateServerEntities()
 	if ( cl_extrapolate.GetBool() && !engine->IsPaused() )
 	{
 		context.EnableExtrapolation( true );
+	}
+
+	if ( bPrevInterpolate != s_bInterpolate && !s_bInterpolate )
+	{
+		// Clear interp history when we disable interpolation
+		C_BaseEntityIterator iterator;
+		C_BaseEntity *pEnt;
+		while ( (pEnt = iterator.Next()) != NULL )
+		{
+			pEnt->ResetLatched();
+		}
 	}
 
 	// Smoothly interpolate position for server entities.
@@ -4391,12 +4389,13 @@ void C_BaseEntity::CalcAbsolutePosition( )
 
 	// Construct the entity-to-world matrix
 	// Start with making an entity-to-parent matrix
-	matrix3x4_t matEntityToParent;
+	ALIGN16 matrix3x4_t matEntityToParent ALIGN16_POST;
 	AngleMatrix( GetLocalAngles(), matEntityToParent );
 	MatrixSetColumn( GetLocalOrigin(), 3, matEntityToParent );
 
 	// concatenate with our parent's transform
-	matrix3x4_t scratchMatrix;
+	m_pMoveParent->CalcAbsolutePosition();
+	ALIGN16 matrix3x4_t scratchMatrix ALIGN16_POST;
 	ConcatTransforms( GetParentToWorldTransform( scratchMatrix ), matEntityToParent, m_rgflCoordinateFrame );
 
 	// pull our absolute position out of the matrix
@@ -4419,7 +4418,7 @@ void C_BaseEntity::CalcAbsolutePosition( )
 	//
 	// So here, we keep our absorigin invalidated. It means we're returning an origin that is a frame old to CalculateIKLocks,
 	// but we'll still render with the right origin.
-	if ( m_iParentAttachment != 0 && (m_pMoveParent->GetEFlags() & EFL_SETTING_UP_BONES) )
+	if ( m_iParentAttachment != 0 && (m_pMoveParent->GetFlags() & EFL_SETTING_UP_BONES) )
 	{
 		m_iEFlags |= EFL_DIRTY_ABSTRANSFORM;
 	}
@@ -4704,7 +4703,7 @@ bool C_BaseEntity::PostNetworkDataReceived( int commands_acknowledged )
 			original_state_data, PC_DATA_PACKED, 
 			counterrors, reporterrors, copydata );
 		// Suppress debugging output
-		int ecount = errorCheckHelper.TransferData( "", -1, GetPredDescMap() );
+		int ecount = errorCheckHelper.TransferData( "", entindex(), GetPredDescMap() );
 		if ( ecount > 0 )
 		{
 			haderrors = true;
@@ -4781,7 +4780,7 @@ C_BaseEntity *C_BaseEntity::Instance( int iEnt )
 	return ClientEntityList().GetBaseEntity( iEnt );
 }
 
-#if defined( WIN32 ) && _MSC_VER <= 1920
+#ifdef WIN32
 #pragma warning( push )
 #include <typeinfo.h>
 #pragma warning( pop )
@@ -5226,6 +5225,10 @@ void C_BaseEntity::DestroyIntermediateData( void )
 void C_BaseEntity::ShiftIntermediateDataForward( int slots_to_remove, int number_of_commands_run )
 {
 #if !defined( NO_ENTITY_PREDICTION )
+	Assert( m_pIntermediateData );
+	if ( !m_pIntermediateData )
+		return;
+
 	Assert( number_of_commands_run >= slots_to_remove );
 
 	// Just moving pointers, yeah
@@ -5663,6 +5666,13 @@ RenderGroup_t C_BaseEntity::GetRenderGroup()
 	if ( m_nRenderMode == kRenderNone )
 		return RENDER_GROUP_OPAQUE_ENTITY;
 
+	// When an entity has a material proxy, we have to recompute
+	// translucency here because the proxy may have changed it.
+	if (modelinfo->ModelHasMaterialProxy( GetModel() ))
+	{
+		modelinfo->RecomputeTranslucency( const_cast<model_t*>(GetModel()), GetSkin(), GetBody(), GetClientRenderable() );
+	}
+
 	// NOTE: Bypassing the GetFXBlend protection logic because we want this to
 	// be able to be called from AddToLeafSystem.
 	int nTempComputeFrame = m_nFXComputeFrame;
@@ -5792,27 +5802,12 @@ int C_BaseEntity::RestoreData( const char *context, int slot, int type )
 	const int savedEFlagsMask = EFL_DIRTY_SHADOWUPDATE;
 	int savedEFlags = GetEFlags() & savedEFlagsMask;
 
-	// model index needs to be set manually for dynamic model refcounting purposes
-	int oldModelIndex = m_nModelIndex;
-
 	CPredictionCopy copyHelper( type, this, PC_DATA_NORMAL, src, PC_DATA_PACKED );
 	int error_count = copyHelper.TransferData( sz, entindex(), GetPredDescMap() );
 
 	// set non-predicting flags back to their prior state
 	RemoveEFlags( savedEFlagsMask );
 	AddEFlags( savedEFlags );
-
-	// restore original model index and change via SetModelIndex
-	int newModelIndex = m_nModelIndex;
-	m_nModelIndex = oldModelIndex;
-	int overrideModelIndex = CalcOverrideModelIndex();
-	if( overrideModelIndex != -1 )
-		newModelIndex = overrideModelIndex;
-	if ( oldModelIndex != newModelIndex )
-	{
-		MDLCACHE_CRITICAL_SECTION(); // ???
-		SetModelIndex( newModelIndex );
-	}
 
 	OnPostRestoreData();
 
@@ -6320,14 +6315,10 @@ bool C_BaseEntity::ValidateEntityAttachedToPlayer( bool &bShouldRetry )
 		return true;
 
 	// Some wearables parent to the view model
-	C_TFPlayer *pPlayer = ToTFPlayer( pParent );
-	if ( pPlayer )
+	C_BasePlayer *pPlayer = ToBasePlayer( pParent );
+	if ( pPlayer && pPlayer->GetViewModel() == this )
 	{
-		if ( pPlayer->GetViewModel() == this )
-			return true;
-
-		if ( pPlayer->HasItem() && ( pPlayer->GetItem()->GetItemID() == TF_ITEM_CAPTURE_FLAG ) && ( pPlayer->GetItem() == this ) )
-			return true;
+		return true;
 	}
 
 	// always allow the briefcase model
@@ -6336,12 +6327,15 @@ bool C_BaseEntity::ValidateEntityAttachedToPlayer( bool &bShouldRetry )
 	{
 		if ( FStrEq( pszModel, "models/flag/briefcase.mdl" ) )
 			return true;
-				
+
+		if ( FStrEq( pszModel, "models/passtime/ball/passtime_ball.mdl" ) )
+			return true;
+
 		if ( FStrEq( pszModel, "models/props_doomsday/australium_container.mdl" ) )
 			return true;
 
 		// Temp for MVM testing
-		if ( FStrEq( pszModel, "models/buildables/sapper_placement.mdl" ) )
+		if ( FStrEq( pszModel, "models/buildables/sapper_placement_sentry1.mdl" ) )
 			return true;
 
 		if ( FStrEq( pszModel, "models/props_td/atom_bomb.mdl" ) )

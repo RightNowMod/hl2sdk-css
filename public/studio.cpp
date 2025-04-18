@@ -14,19 +14,13 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-// How large the stack is for flex rules
-#define STUDIO_FLEX_STACK 32
 
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 
-mstudioanimdesc_t &studiohdr_t::pAnimdesc( int i ) const
+mstudioanimdesc_t &studiohdr_t::pAnimdesc_Internal( int i ) const
 { 
-	if (numincludemodels == 0)
-	{
-		return *pLocalAnimdesc( i );
-	}
 
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
@@ -244,12 +238,9 @@ bool studiohdr_t::SequencesAvailable() const
 // Purpose:
 //-----------------------------------------------------------------------------
 
-int studiohdr_t::GetNumSeq( void ) const
+
+int studiohdr_t::GetNumSeq_Internal( void ) const
 {
-	if (numincludemodels == 0)
-	{
-		return numlocalseq;
-	}
 
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
@@ -260,12 +251,9 @@ int studiohdr_t::GetNumSeq( void ) const
 // Purpose:
 //-----------------------------------------------------------------------------
 
-mstudioseqdesc_t &studiohdr_t::pSeqdesc( int i ) const
+
+mstudioseqdesc_t &studiohdr_t::pSeqdesc_Internal( int i ) const
 {
-	if (numincludemodels == 0)
-	{
-		return *pLocalSeqdesc( i );
-	}
 
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
@@ -286,12 +274,9 @@ mstudioseqdesc_t &studiohdr_t::pSeqdesc( int i ) const
 // Purpose:
 //-----------------------------------------------------------------------------
 
-int studiohdr_t::iRelativeAnim( int baseseq, int relanim ) const
+
+int studiohdr_t::iRelativeAnim_Internal( int baseseq, int relanim ) const
 {
-	if (numincludemodels == 0)
-	{
-		return relanim;
-	}
 
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
@@ -305,12 +290,9 @@ int studiohdr_t::iRelativeAnim( int baseseq, int relanim ) const
 // Purpose:
 //-----------------------------------------------------------------------------
 
-int studiohdr_t::iRelativeSeq( int baseseq, int relseq ) const
+
+int studiohdr_t::iRelativeSeq_Internal( int baseseq, int relseq ) const
 {
-	if (numincludemodels == 0)
-	{
-		return relseq;
-	}
 
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
@@ -383,19 +365,7 @@ int studiohdr_t::GetSharedPoseParameter( int iSequence, int iLocalPose ) const
 	virtualmodel_t *pVModel = (virtualmodel_t *)GetVirtualModel();
 	Assert( pVModel );
 
-	int group = pVModel->m_seq[iSequence].group;
-	virtualgroup_t* pGroup = pVModel->m_group.IsValidIndex( group ) ? &pVModel->m_group[group] : NULL;
-
-	// Josh: This used to return iLocalPose when it was out of bounds
-	// but that is not correct, this should return -1 because
-	// otherwise it's just some random unrelated index. 
-	if ( !pGroup )
-		return -1;
-
-	// Josh: Sometimes the Sniper can try to eat a gun and we hit this.
-	// Model pose group data is just complete garbage out of studiomdl, woo!
-	if ( !pGroup->masterPose.IsValidIndex( iLocalPose ) )
-		return -1;
+	virtualgroup_t *pGroup = &pVModel->m_group[ pVModel->m_seq[iSequence].group ];
 
 	return pGroup->masterPose[iLocalPose];
 }
@@ -899,12 +869,9 @@ const studiohdr_t *CStudioHdr::pAnimStudioHdr( int animation )
 
 
 
-mstudioanimdesc_t &CStudioHdr::pAnimdesc( int i )
+
+mstudioanimdesc_t &CStudioHdr::pAnimdesc_Internal( int i )
 { 
-	if (m_pVModel == NULL)
-	{
-		return *m_pStudioHdr->pLocalAnimdesc( i );
-	}
 
 	const studiohdr_t *pStudioHdr = GroupStudioHdr( m_pVModel->m_anim[i].group );
 
@@ -915,13 +882,9 @@ mstudioanimdesc_t &CStudioHdr::pAnimdesc( int i )
 // Purpose:
 //-----------------------------------------------------------------------------
 
-int CStudioHdr::GetNumSeq( void ) const
-{
-	if (m_pVModel == NULL)
-	{
-		return m_pStudioHdr->numlocalseq;
-	}
 
+int CStudioHdr::GetNumSeq_Internal( void ) const
+{
 	return m_pVModel->m_seq.Count();
 }
 
@@ -929,29 +892,16 @@ int CStudioHdr::GetNumSeq( void ) const
 // Purpose:
 //-----------------------------------------------------------------------------
 
-mstudioseqdesc_t &CStudioHdr::pSeqdesc( int i )
+
+mstudioseqdesc_t &CStudioHdr::pSeqdesc_Internal( int i )
 {
-	Assert( ( i >= 0 && i < GetNumSeq() ) || ( i == 1 && GetNumSeq() <= 1 ) );
+	Assert( i >= 0 && i < GetNumSeq() );
 	if ( i < 0 || i >= GetNumSeq() )
 	{
-		if ( GetNumSeq() <= 0 )
-		{
-			// Return a zero'd out struct reference if we've got nothing.
-			// C_BaseObject::StopAnimGeneratedSounds was crashing due to this function
-			//	returning a reference to garbage. It should now see numevents is 0,
-			//	and bail.
-			static mstudioseqdesc_t s_nil_seq;
-			return s_nil_seq;
-		}
-
 		// Avoid reading random memory.
 		i = 0;
 	}
-	
-	if (m_pVModel == NULL)
-	{
-		return *m_pStudioHdr->pLocalSeqdesc( i );
-	}
+
 
 	const studiohdr_t *pStudioHdr = GroupStudioHdr( m_pVModel->m_seq[i].group );
 
@@ -962,12 +912,9 @@ mstudioseqdesc_t &CStudioHdr::pSeqdesc( int i )
 // Purpose:
 //-----------------------------------------------------------------------------
 
-int CStudioHdr::iRelativeAnim( int baseseq, int relanim ) const
+
+int CStudioHdr::iRelativeAnim_Internal( int baseseq, int relanim ) const
 {
-	if (m_pVModel == NULL)
-	{
-		return relanim;
-	}
 
 	virtualgroup_t *pGroup = &m_pVModel->m_group[ m_pVModel->m_seq[baseseq].group ];
 
@@ -1053,19 +1000,7 @@ int CStudioHdr::GetSharedPoseParameter( int iSequence, int iLocalPose ) const
 	int group = m_pVModel->m_seq[iSequence].group;
 	virtualgroup_t *pGroup = m_pVModel->m_group.IsValidIndex( group ) ? &m_pVModel->m_group[ group ] : NULL;
 
-	// Josh: This used to return iLocalPose when it was out of bounds
-	// but that is not correct, this should return -1 because
-	// otherwise it's just some random unrelated index. 
-	if ( !pGroup )
-		return -1;
-
-	// Josh: Sometimes the Sniper can try to eat a gun and we hit this.
-	// Model pose group data is just complete garbage out of studiomdl, woo!
-	if ( !pGroup->masterPose.IsValidIndex( iLocalPose ) )
-		return -1;
-
-	return pGroup->masterPose[iLocalPose];
-
+	return pGroup ? pGroup->masterPose[iLocalPose] : iLocalPose;
 }
 
 
@@ -1415,17 +1350,11 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 
 	for (int i = 0; i < numflexrules(); i++)
 	{
-		float stack[STUDIO_FLEX_STACK] = {};
+		float stack[32] = {};
 		int k = 0;
 		mstudioflexrule_t *prule = pFlexRule( i );
 
 		mstudioflexop_t *pops = prule->iFlexOp( 0 );
-
-		if ( prule->flex < 0 || prule->flex >= numflexdesc() )
-		{
-			AssertMsg( false, "Invalid flex rules in model" );
-			continue;
-		}
 /*
 		// JasonM hack for flex perf testing...
 		int nFlexRulesToRun = 0;								// 0 means run them all
@@ -1440,30 +1369,12 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 
 		for (int j = 0; j < prule->numops; j++)
 		{
-			// Generic precondition for an op - will assert and break from the switch, turning the op into a no-op
-			#define CHECK(expr) { if ( !(expr) ) { AssertMsg(false, "Invalid flex rules in model"); break; } };
-
-			// Check that the stack pointer is at least this many elements.  All ops that access previous values in the
-			// stack must be annotated with this.
-			#define CHECK_STACK_DEPTH(min)       CHECK( k >= min );
-			// Check that we can move the stack forward this many units.  All ops that increment the stack must be
-			// annotated with this.
-			//
-			// !! You must CHECK_STACK_SPACE(1) before accessing/assigning stack[k] -- k is the *next* stack location,
-			//    and may be one past the end of the array if the stack is full.
-			#define CHECK_STACK_SPACE(num)       CHECK( k <= STUDIO_FLEX_STACK - num );
-			// Check that the value is a valid controller index.
-			#define CHECK_VALID_CONTROLLER_INDEX(idx) CHECK( idx >= 0 && idx < numflexcontrollers() );
-			// Check that the value is a valid descriptor index, for access into dest[]
-			#define CHECK_VALID_DESCRIPTOR_INDEX(idx) CHECK( idx >= 0 && idx < numflexdesc() );
-
 			switch (pops->op)
 			{
-			case STUDIO_ADD: CHECK_STACK_DEPTH(2); stack[k-2] = stack[k-2] + stack[k-1]; k--; break;
-			case STUDIO_SUB: CHECK_STACK_DEPTH(2); stack[k-2] = stack[k-2] - stack[k-1]; k--; break;
-			case STUDIO_MUL: CHECK_STACK_DEPTH(2); stack[k-2] = stack[k-2] * stack[k-1]; k--; break;
+			case STUDIO_ADD: stack[k-2] = stack[k-2] + stack[k-1]; k--; break;
+			case STUDIO_SUB: stack[k-2] = stack[k-2] - stack[k-1]; k--; break;
+			case STUDIO_MUL: stack[k-2] = stack[k-2] * stack[k-1]; k--; break;
 			case STUDIO_DIV:
-				CHECK_STACK_DEPTH(2);
 				if (stack[k-1] > 0.0001)
 				{
 					stack[k-2] = stack[k-2] / stack[k-1];
@@ -1472,34 +1383,26 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 				{
 					stack[k-2] = 0;
 				}
-				k--;
+				k--; 
 				break;
-			case STUDIO_NEG: CHECK_STACK_DEPTH(1); stack[k-1] = -stack[k-1]; break;
-			case STUDIO_MAX: CHECK_STACK_DEPTH(2); stack[k-2] = max( stack[k-2], stack[k-1] ); k--; break;
-			case STUDIO_MIN: CHECK_STACK_DEPTH(2); stack[k-2] = min( stack[k-2], stack[k-1] ); k--; break;
-				case STUDIO_CONST: CHECK_STACK_SPACE(1); stack[k] = pops->d.value; k++; break;
-			case STUDIO_FETCH1:
-				{
-				CHECK_STACK_SPACE(1);
-				CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
+			case STUDIO_NEG: stack[k-1] = -stack[k-1]; break;
+			case STUDIO_MAX: stack[k-2] = max( stack[k-2], stack[k-1] ); k--; break;
+			case STUDIO_MIN: stack[k-2] = min( stack[k-2], stack[k-1] ); k--; break;
+			case STUDIO_CONST: stack[k] = pops->d.value; k++; break;
+			case STUDIO_FETCH1: 
+				{ 
 				int m = pFlexcontroller( (LocalFlexController_t)pops->d.index)->localToGlobal;
 				stack[k] = src[m];
-				k++;
+				k++; 
 				break;
 				}
 			case STUDIO_FETCH2:
 				{
-					CHECK_STACK_SPACE(1);
-					CHECK_VALID_DESCRIPTOR_INDEX(pops->d.index);
 					stack[k] = dest[pops->d.index]; k++; break;
 				}
 			case STUDIO_COMBO:
 				{
 					int m = pops->d.index;
-					CHECK_VALID_CONTROLLER_INDEX(m);
-					CHECK_STACK_DEPTH(m);
-					if ( m == 0 ) { CHECK_STACK_SPACE(1); }
-
 					int km = k - m;
 					for ( int iStack = km + 1; iStack < k; ++iStack )
 					{
@@ -1511,8 +1414,6 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 			case STUDIO_DOMINATE:
 				{
 					int m = pops->d.index;
-					CHECK_VALID_CONTROLLER_INDEX(m);
-					CHECK_STACK_DEPTH(m + 1);
 					int km = k - m;
 					float dv = stack[ km ];
 					for ( int iStack = km + 1; iStack < k; ++iStack )
@@ -1524,29 +1425,22 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 				}
 				break;
 			case STUDIO_2WAY_0:
-				{
-					CHECK_STACK_SPACE(1);
-					CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
+				{ 
 					int m = pFlexcontroller( (LocalFlexController_t)pops->d.index )->localToGlobal;
 					stack[ k ] = RemapValClamped( src[m], -1.0f, 0.0f, 1.0f, 0.0f );
-					k++;
+					k++; 
 				}
 				break;
 			case STUDIO_2WAY_1:
-				{
-					CHECK_STACK_SPACE(1);
-					CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
+				{ 
 					int m = pFlexcontroller( (LocalFlexController_t)pops->d.index )->localToGlobal;
 					stack[ k ] = RemapValClamped( src[m], 0.0f, 1.0f, 0.0f, 1.0f );
-					k++;
+					k++; 
 				}
 				break;
 			case STUDIO_NWAY:
 				{
-					CHECK_STACK_DEPTH(5);
-					CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
 					LocalFlexController_t valueControllerIndex = static_cast< LocalFlexController_t >( (int)stack[ k - 1 ] );
-					CHECK_VALID_CONTROLLER_INDEX(valueControllerIndex);
 					int m = pFlexcontroller( valueControllerIndex )->localToGlobal;
 					float flValue = src[ m ];
 					int v = pFlexcontroller( (LocalFlexController_t)pops->d.index )->localToGlobal;
@@ -1573,21 +1467,24 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 
 					stack[ k - 5 ] = flValue * src[ v ];
 
-					k -= 4;
+					k -= 4; 
 				}
 				break;
 			case STUDIO_DME_LOWER_EYELID:
-				{
-					CHECK_STACK_DEPTH(3);
-					CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 1 ]);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 2 ]);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 3 ]);
-
+				{ 
 					const mstudioflexcontroller_t *const pCloseLidV = pFlexcontroller( (LocalFlexController_t)pops->d.index );
 					const float flCloseLidV = RemapValClamped( src[ pCloseLidV->localToGlobal ], pCloseLidV->min, pCloseLidV->max, 0.0f, 1.0f );
+
 					const mstudioflexcontroller_t *const pCloseLid = pFlexcontroller( static_cast< LocalFlexController_t >( (int)stack[ k - 1 ] ) );
 					const float flCloseLid = RemapValClamped( src[ pCloseLid->localToGlobal ], pCloseLid->min, pCloseLid->max, 0.0f, 1.0f );
+
+					int nBlinkIndex = static_cast< int >( stack[ k - 2 ] );
+					float flBlink = 0.0f;
+					if ( nBlinkIndex >= 0 )
+					{
+						const mstudioflexcontroller_t *const pBlink = pFlexcontroller( static_cast< LocalFlexController_t >( (int)stack[ k - 2 ] ) );
+						flBlink = RemapValClamped( src[ pBlink->localToGlobal ], pBlink->min, pBlink->max, 0.0f, 1.0f );
+					}
 
 					int nEyeUpDownIndex = static_cast< int >( stack[ k - 3 ] );
 					float flEyeUpDown = 0.0f;
@@ -1609,17 +1506,20 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 				}
 				break;
 			case STUDIO_DME_UPPER_EYELID:
-				{
-					CHECK_STACK_DEPTH(3);
-					CHECK_VALID_CONTROLLER_INDEX(pops->d.index);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 1 ]);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 2 ]);
-					CHECK_VALID_CONTROLLER_INDEX((int)stack[ k - 3 ]);
+				{ 
 					const mstudioflexcontroller_t *const pCloseLidV = pFlexcontroller( (LocalFlexController_t)pops->d.index );
 					const float flCloseLidV = RemapValClamped( src[ pCloseLidV->localToGlobal ], pCloseLidV->min, pCloseLidV->max, 0.0f, 1.0f );
 
 					const mstudioflexcontroller_t *const pCloseLid = pFlexcontroller( static_cast< LocalFlexController_t >( (int)stack[ k - 1 ] ) );
 					const float flCloseLid = RemapValClamped( src[ pCloseLid->localToGlobal ], pCloseLid->min, pCloseLid->max, 0.0f, 1.0f );
+
+					int nBlinkIndex = static_cast< int >( stack[ k - 2 ] );
+					float flBlink = 0.0f;
+					if ( nBlinkIndex >= 0 )
+					{
+						const mstudioflexcontroller_t *const pBlink = pFlexcontroller( static_cast< LocalFlexController_t >( (int)stack[ k - 2 ] ) );
+						flBlink = RemapValClamped( src[ pBlink->localToGlobal ], pBlink->min, pBlink->max, 0.0f, 1.0f );
+					}
 
 					int nEyeUpDownIndex = static_cast< int >( stack[ k - 3 ] );
 					float flEyeUpDown = 0.0f;
@@ -1641,10 +1541,6 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 				}
 				break;
 			}
-			#undef CHECK
-			#undef CHECK_STACK_DEPTH
-			#undef CHECK_STACK_SPACE
-			#undef CHECK_VALID_CONTROLLER_INDEX
 
 			pops++;
 		}
@@ -1671,7 +1567,33 @@ void CStudioHdr::RunFlexRules( const float *src, float *dest )
 	}
 }
 
+//-----------------------------------------------------------------------------
+//	propagate flags all the way down
+//-----------------------------------------------------------------------------
 
+void CStudioHdr::setBoneFlags( int iBone, int flags )
+{
+	((mstudiobone_t *)pBone( iBone ))->flags |= flags; 
+	mstudiolinearbone_t *pLinear = pLinearBones();
+	if ( pLinear )
+	{
+		*(pLinear->pflags( iBone )) |= flags;
+	}
+
+	m_boneFlags[ iBone ] |= flags; 
+}
+
+void CStudioHdr::clearBoneFlags( int iBone, int flags )
+{ 
+	((mstudiobone_t *)pBone( iBone ))->flags &= ~flags; 
+	mstudiolinearbone_t *pLinear = pLinearBones();
+	if ( pLinear )
+	{
+		*(pLinear->pflags( iBone )) &= ~flags;
+	}
+
+	m_boneFlags[ iBone ] &= ~flags; 
+}
 
 //-----------------------------------------------------------------------------
 //	CODE PERTAINING TO ACTIVITY->SEQUENCE MAPPING SUBCLASS
@@ -1923,4 +1845,37 @@ void CStudioHdr::CActivityToSequenceMapping::SetValidationPair( const CStudioHdr
 {
 	m_expectedPStudioHdr = pstudiohdr->GetRenderHdr();
 	m_expectedVModel = pstudiohdr->GetVirtualModel();
+}
+
+
+//-----------------------------------------------------------------------------
+//	
+//-----------------------------------------------------------------------------
+
+int CStudioHdr::LookupSequence( const char *pszName )
+{
+	int iSequence = m_namedSequence.Find( pszName );
+
+	if ( iSequence == m_namedSequence.InvalidIndex() )
+	{
+		for (iSequence = 0; iSequence < GetNumSeq(); iSequence++)
+		{
+			if ( V_stricmp( pSeqdesc( iSequence ).pszLabel(), pszName ) == 0)
+				break;
+		}
+		if ( iSequence == GetNumSeq() )
+		{
+			m_namedSequence.Insert( pszName, -1 );
+			return -1;
+		}
+		else
+		{
+			m_namedSequence.Insert( pszName, iSequence );
+			return iSequence;
+		}
+	}
+	else
+	{
+		return m_namedSequence[iSequence];
+	}
 }

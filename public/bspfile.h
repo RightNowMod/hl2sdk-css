@@ -13,6 +13,7 @@
 #include "mathlib/mathlib.h"
 #endif
 
+#include "mathlib/vector4d.h"
 #include "datamap.h"
 #include "mathlib/bumpvects.h"
 #include "mathlib/compressed_light_cube.h"
@@ -22,7 +23,7 @@
 
 // MINBSPVERSION is the minimum acceptable version.  The engine will load MINBSPVERSION through BSPVERSION
 #define MINBSPVERSION 19
-#define BSPVERSION 20
+#define BSPVERSION 21
 
 
 // This needs to match the value in gl_lightmap.h
@@ -59,10 +60,10 @@
 // 16 bit short limits
 #define	MAX_MAP_MODELS					1024
 #define	MAX_MAP_BRUSHES					8192
-#define	MAX_MAP_ENTITIES				8192
+#define	MAX_MAP_ENTITIES				20480 // bumped from 8192
 #define	MAX_MAP_TEXINFO					12288
 #define MAX_MAP_TEXDATA					2048
-#define MAX_MAP_DISPINFO				2048
+#define MAX_MAP_DISPINFO				16384
 #define MAX_MAP_DISP_VERTS				( MAX_MAP_DISPINFO * ((1<<MAX_MAP_DISP_POWER)+1) * ((1<<MAX_MAP_DISP_POWER)+1) )
 #define MAX_MAP_DISP_TRIS				( (1 << MAX_MAP_DISP_POWER) * (1 << MAX_MAP_DISP_POWER) * 2 )
 #define MAX_DISPVERTS					NUM_DISP_POWER_VERTS( MAX_MAP_DISP_POWER )
@@ -92,7 +93,7 @@
 #define	MAX_MAP_TEXTURES				1024
 #define MAX_MAP_WORLDLIGHTS				8192
 #define MAX_MAP_CUBEMAPSAMPLES			1024
-#define MAX_MAP_OVERLAYS				512 
+#define MAX_MAP_OVERLAYS				1024 // bumped from 512
 #define MAX_MAP_WATEROVERLAYS			16384
 #define MAX_MAP_TEXDATA_STRING_DATA		256000
 #define MAX_MAP_TEXDATA_STRING_TABLE	65536
@@ -353,6 +354,7 @@ enum
 	LUMP_FACES_HDR					= 58,	// HDR maps may have different face data.
 	LUMP_MAP_FLAGS                  = 59,   // extended level-wide flags. not present in all levels
 	LUMP_OVERLAY_FADES				= 60,	// Fade distances for overlays
+	LUMP_DISP_MULTIBLEND			= 61,	// Displacement multiblend info
 };
 
 
@@ -364,6 +366,7 @@ enum
 	LUMP_OCCLUSION_VERSION         = 2,
 	LUMP_LEAFS_VERSION			   = 1,
 	LUMP_LEAF_AMBIENT_LIGHTING_VERSION = 1,
+	LUMP_WORLDLIGHTS_VERSION           = 1
 };
 
 
@@ -635,6 +638,23 @@ public:
 	unsigned short m_uiTags;		// Displacement triangle tags.
 };
 
+#define MAX_MULTIBLEND_CHANNELS		4
+
+class CDispMultiBlend
+{
+public:
+	DECLARE_BYTESWAP_DATADESC();
+
+	Vector4D	m_vMultiBlend;
+	Vector4D	m_vAlphaBlend;
+	Vector		m_vMultiBlendColors[ MAX_MULTIBLEND_CHANNELS ];
+};
+
+#define DISP_MULTIBLEND_PROP_THRESHOLD	2.0f
+
+#define DISP_INFO_FLAG_HAS_MULTIBLEND	0x40000000
+#define DISP_INFO_FLAG_MAGIC			0x80000000
+
 class ddispinfo_t
 {
 public:
@@ -663,7 +683,7 @@ public:
 	CDispCornerNeighbors	m_CornerNeighbors[4];	// Indexed by CORNER_ defines.
 
 	enum unnamed { ALLOWEDVERTS_SIZE = PAD_NUMBER( MAX_DISPVERTS, 32 ) / 32 };
-	uint32	m_AllowedVerts[ALLOWEDVERTS_SIZE];	// This is built based on the layout and sizes of our neighbors
+	unsigned int	m_AllowedVerts[ALLOWEDVERTS_SIZE];	// This is built based on the layout and sizes of our neighbors
 														// and tells us which vertices are allowed to be active.
 };
 
@@ -794,7 +814,9 @@ struct dfaceid_t
 #if defined( _X360 )
 #pragma bitfield_order( push, lsb_to_msb )
 #endif
+#ifdef WIN32
 #pragma warning( disable:4201 )	// C4201: nonstandard extension used: nameless struct/union
+#endif
 struct dleaf_version_0_t
 {
 	DECLARE_BYTESWAP_DATADESC();
@@ -963,6 +985,31 @@ enum emittype_t
 
 // Flags for dworldlight_t::flags
 #define DWL_FLAGS_INAMBIENTCUBE		0x0001	// This says that the light was put into the per-leaf ambient cubes.
+#define DWL_FLAGS_CASTENTITYSHADOWS	0x0002	// This says that the light will cast shadows from entities
+
+// Old version of the worldlight struct, used for backward compatibility loading.
+struct dworldlight_version0_t
+{
+	DECLARE_BYTESWAP_DATADESC();
+	Vector		origin;
+	Vector		intensity;
+	Vector		normal;			// for surfaces and spotlights
+	int			cluster;
+	emittype_t	type;
+	int			style;
+	float		stopdot;		// start of penumbra for emit_spotlight
+	float		stopdot2;		// end of penumbra for emit_spotlight
+	float		exponent;		// 
+	float		radius;			// cutoff distance
+	// falloff for emit_spotlight + emit_point: 
+	// 1 / (constant_attn + linear_attn * dist + quadratic_attn * dist^2)
+	float		constant_attn;	
+	float		linear_attn;
+	float		quadratic_attn;
+	int			flags;			// Uses a combination of the DWL_FLAGS_ defines.
+	int			texinfo;		// 
+	int			owner;			// entity that this light it relative to
+};
 
 
 struct dworldlight_t
@@ -971,6 +1018,7 @@ struct dworldlight_t
 	Vector		origin;
 	Vector		intensity;
 	Vector		normal;			// for surfaces and spotlights
+	Vector		shadow_cast_offset;	// gets added to the light origin when this light is used as a shadow caster (only if DWL_FLAGS_CASTENTITYSHADOWS flag is set)
 	int			cluster;
 	emittype_t	type;
     int			style;

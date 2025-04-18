@@ -35,6 +35,8 @@ public:
 	int GetWritableBones();
 	void SetWritableBones( int flags );
 
+	bool isBoneAvailableForRead( int iBone ) const;
+
 	// Get bones for read or write access.
 	const matrix3x4_t&	GetBone( int iBone ) const;
 	const matrix3x4_t&	operator[]( int iBone ) const;
@@ -129,3 +131,4 @@ inline matrix3x4_t *CBoneAccessor::GetBoneArrayForWrite( void ) const
 }
 
 #endif // BONE_ACCESSOR_H
+
